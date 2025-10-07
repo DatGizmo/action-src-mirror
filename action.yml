@@ -159,10 +159,10 @@ runs:
         V2_SRC_ARTIFACTORY_PATH="${ARTIFACTORY_BASE_FOLDER_PATH_CLEAN}/${{ github.event.repository.name }}/${{ github.ref_name }}"
         if [[ "${{ inputs.sdk-manager-api-version }}" == "1" ]]; then
           SRC_ARTIFACTORY_PATH=${V1_SRC_ARTIFACTORY_PATH}/${FILE_NAME}
-          SPEC_VARS="v1Name=${V1_SRC_ARTIFACTORY_PATH};v2Name=${V2_SRC_ARTIFACTORY_PATH};file=${FILE_NAME}"
+          SPEC_VARS="v1Path=${V1_SRC_ARTIFACTORY_PATH#*/};v2Path=${V2_SRC_ARTIFACTORY_PATH#*/};file=${FILE_NAME}"
         else
           SRC_ARTIFACTORY_PATH=${V2_SRC_ARTIFACTORY_PATH}/${FILE_NAME}
-          SPEC_VARS="v2Name=${V2_SRC_ARTIFACTORY_PATH};file=${FILE_NAME}"
+          SPEC_VARS="v2Path=${V2_SRC_ARTIFACTORY_PATH#*/};file=${FILE_NAME}"
         fi
         echo "SRC_ARTIFACTORY_PATH=${SRC_ARTIFACTORY_PATH}"
         jfrog rt u ${FILE}.tar.gz ${SRC_ARTIFACTORY_PATH} --fail-no-op
@@ -170,8 +170,9 @@ runs:
           jfrog rt cp --fail-no-op --flat $V1_SRC_ARTIFACTORY_PATH $V2_SRC_ARTIFACTORY_PATH
         fi
         if [[ "tag" == "${{ github.ref_type }}" ]]; then
+          echo "SPEC_VARS=${SPEC_VARS}"
           jfrog ds rbc "${{ github.event.repository.name }}" "${{ github.ref_name }}" \
-                       "--spec=src-spec.json" "--spec-vars" "${SPEC_VARS}"
+                       "--spec=${{ github.action_path}}/src-spec.json" "--spec-vars" "${SPEC_VARS}"
           jfrog ds rbs "${{ github.event.repository.name }}" "${{ github.ref_name }}"
           jfrog ds rbd "${{ github.event.repository.name }}" "${{ github.ref_name }}" \
                        --create-repo \
@@ -220,6 +221,19 @@ runs:
           $API_VERSION_FLAG \
           $REPO_TYPE_FLAG $TOOLCHAIN_VERSION_FLAG
         jfrog rt u index.json ${{env.INDEX_ARTIFACTORY_PATH}} --fail-no-op
+        if [[ "tag" == "${{ github.ref_type }}" ]]; then
+          # Delete the previous version of the release bundle, as the new bundle will contain files that have been updated.
+          # If a file is part of a previous release bundle, it can't be distributed.
+          jfrog ds rbdel "sdk-manager" "v9.9.9" --sync --quiet --delete-from-dist || true
+
+          jfrog ds rbc "--desc '${{ github.event.repository.name}} / ${github.ref_name} of bundle. Older with same version have beend delted'" \
+                       "sdk-manager" "v9.9.9" \
+                       "${ARTIFACTORY_BASE_FOLDER_PATH_CLEAN}/sdk-manager/*.json"
+          jfrog ds rbs "sdk-manager" "v9.9.9"
+          jfrog ds rbd "sdk-manager" "v9.9.9" \
+                       --create-repo \
+                       --country-codes 'CN'
+        fi
 
     - name: Remove artifactory server
       if: |
