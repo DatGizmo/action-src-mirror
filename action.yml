@@ -224,7 +224,7 @@ runs:
         if [[ "tag" == "${{ github.ref_type }}" ]]; then
           # Delete the previous version of the release bundle, as the new bundle will contain files that have been updated.
           # If a file is part of a previous release bundle, it can't be distributed.
-          jfrog ds rbdel "sdk-manager" "v9.9.9" --sync --quiet --delete-from-dist --country-code 'CN' || true
+          jfrog ds rbdel "sdk-manager" "v9.9.9" --sync --quiet --delete-from-dist --country-codes 'CN' || true
 
           jfrog ds rbc --desc "${{ github.event.repository.name}} / ${{ github.ref_name }} of bundle. Older variants with same version have beend delted" \
                        "sdk-manager" "v9.9.9" \
